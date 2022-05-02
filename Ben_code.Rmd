@@ -47,7 +47,7 @@ world_map = map_data("worldHires", ylim= lat_bounds, xlim=lon_bounds)
 plot(Water_projected)
 plot(Stations_projected)
 plot(DHEC_projected)
-
+#initial map visulaization
 SC_map = ggplot() +
    geom_sf(data=Water_projected, aes(color="Basin")) +
   geom_sf(data=DHEC_projected, alpha=0.5, aes(color="black"), fill="303D")+
@@ -56,5 +56,115 @@ SC_map = ggplot() +
 
 SC_map
 
+
+```
+
+
+
+```{r}
+
+#From Birch
+data18 <- read_xls("data/2018303d_final.xls")
+data08 <- read_xls("data/SC_303d_lists_2006to2016/2008303dfinal020608prtyrk.xls")
+data98 <- read_xls("data/SC_303d_lists_1998to2004/1998303dfin_al_rec_only.xls")
+
+# Stations who FAILED to improve from 1998 to 2008
+stationsFail98to08 <- inner_join(data98, data08, by = "STATION")
+head(stationsFail98to08)
+fail_list = unique(stationsFail98to08$HUC_12)
+fail_list
+head(Stations_projected)
+stationsFail10yr_updated <- #left_join(stationsFail98to08, Stations_projected, by = "HUC_12")
+  Stations_projected %>%
+  mutate(fail = ifelse(HUC_12 %in% fail_list, TRUE, FALSE))
+summary(stationsFail10yr_updated)
+stationsFail10yr_updated_2 = stationsFail10yr_updated %>% filter(fail==TRUE)
+summary(stationsFail10yr_updated_2)
+
+# Stations who FAILED to improve from 1998 to 2018
+stationsFail20yr <- inner_join(stationsFail98to08, data18, by = "STATION")
+stationsFail20yr_join <- left_join(stationsFail20yr, Stations_projected, by = "HUC_12")
+fail_list_2 = unique(stationsFail20yr$HUC_12)
+stationsFail20yr_updated <- 
+  Stations_projected %>%
+  mutate(fail = ifelse(HUC_12 %in% fail_list_2, TRUE, FALSE))
+stationsFail20yr_updated_2 = stationsFail20yr_updated %>% filter(fail==TRUE)
+summary(stationsFail20yr_updated_2)
+
+
+
+# Stations who got better and were REMOVED from 1998 to 2018
+stationsPass20yr <- data18[!data18$STATION %in% stationsFail20yr$STATION,]
+stationsPass20yr_join <- left_join(stationsPass20yr, Stations_projected, by = "HUC_12")
+pass_list = unique(stationsPass20yr$HUC_12)
+stationsPass20yr_updated <- 
+  Stations_projected %>%
+  mutate(pass = ifelse(HUC_12 %in% pass_list, TRUE, FALSE))
+stationsPass20yr_updated_2 = stationsPass20yr_updated %>% filter(pass==TRUE)
+summary(stationsPass20yr_updated)
+
+# Stations who were ADDED between 1998 and 2008 
+stationsWorse98to08 <- data08[!data08$STATION %in% data98$STATION,]
+
+# Stations who were ADDED between 1998 and 2018
+stationsWorse20yr <- data18[!data18$STATION %in% stationsWorse98to08$STATION,]
+stationsWorse20yr_join <- left_join(stationsWorse20yr, Stations_projected, by = "HUC_12")
+
+worse_list = unique(stationsWorse20yr$HUC_12)
+stationsWorse20yr_updated <- 
+  Stations_projected %>%
+  mutate(worse = ifelse(HUC_12 %in% worse_list, TRUE, FALSE))
+stationsWorse20yr_updated_2 = stationsWorse20yr_updated %>% filter(worse==TRUE)
+summary(stationsWorse20yr_updated)
+
+```
+
+
+
+```{r}
+#MAPS From Ben
+fail20year_map = ggplot() +
+   geom_sf(data=Water_projected, aes(color="Basin")) +
+  geom_point(data=stationsFail20yr_updated_2, alpha =0.7, aes(x=LONGITUDE, y=LATITUDE, color="SITE")) +
+  coord_sf(1.3, xlim = lon_bounds, ylim = lat_bounds)+
+  ggtitle("Sites that failed to improve from '98-'18")
+fail20year_map
+
+
+fail10year_map = ggplot() +
+   geom_sf(data=Water_projected, aes(color="Basin")) +
+  geom_point(data=stationsFail10yr_updated_2, alpha =0.7, aes(x=LONGITUDE, y=LATITUDE, color="SITE")) +
+  coord_sf(1.3, xlim = lon_bounds, ylim = lat_bounds)+
+  ggtitle("Sites that failed to improve from '98-'08")
+fail10year_map
+
+pass20year_map = ggplot() +
+   geom_sf(data=Water_projected, aes(color="Basin")) +
+  geom_point(data=stationsPass20yr_updated_2, alpha =0.5, aes(x=LONGITUDE, y=LATITUDE, color="SITE")) +
+  coord_sf(1.3, xlim = lon_bounds, ylim = lat_bounds)+
+  ggtitle("Sites that improved from '98-'18")
+pass20year_map
+
+added_stations_map = ggplot() +
+   geom_sf(data=Water_projected, aes(color="Basin")) +
+  geom_point(data=stationsWorse20yr_updated_2, alpha =0.5, aes(x=LONGITUDE, y=LATITUDE, color="SITE")) +
+  coord_sf(1.3, xlim = lon_bounds, ylim = lat_bounds)+
+  ggtitle("Sites that were added from '98-'18")
+added_stations_map
+
+
+failures <- stationsFail20yr %>% 
+  group_by(LOCATION) %>% 
+  summarize(NumCauses=n()) %>%
+  filter(NumCauses == 8)
+#SUPER FAIL MAP
+failures_2 = left_join(failures, stationsFail20yr_join, by="LOCATION")
+summary(stationsFail20yr_join)
+super_fail_map = ggplot() +
+   geom_sf(data=Water_projected, aes(color="Basin")) +
+  geom_point(data=failures_2, alpha =0.5, aes(x=LONGITUDE, y=LATITUDE, color="SITE")) +
+  coord_sf(1.3, xlim = lon_bounds, ylim = lat_bounds)+
+  ggtitle("Sites that were Problematic with 8 Causes")
+super_fail_map
 
 ```
